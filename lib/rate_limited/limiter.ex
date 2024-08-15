@@ -1,52 +1,63 @@
 defmodule Limiter do
   use GenServer
 
+  # Constants
+  @const_time 10000
+
+  @const_threshold 5
+
   # Client API
 
   def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)  # Registering the GenServer by module name
+    # Registering the GenServer by module name
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  def block do
-    GenServer.call(__MODULE__, :block)
+  def block(caller_ip) do
+    GenServer.call(__MODULE__, {:block, caller_ip})
   end
 
-  def check_state do
-    GenServer.call(__MODULE__, :check_state)
+  def check_state(caller_ip) do
+    GenServer.call(__MODULE__, {:check_state, caller_ip})
   end
-
 
   # Server (GenServer) callbacks
-
   @impl true
-  def init(_state) do
-    state = %{blocked: false, counter: 0}
-    IO.inspect("Limiter started")
-    {:ok, state}
+  def init(_args) do
+    {:ok, %{}}
   end
 
   @impl true
-  def handle_call(:block, _from, state) do
-    new_counter = state.counter + 1
-    new_blocked = if new_counter > 3, do: true, else: false
+  def handle_call({:block, caller_ip}, _from, state) do
+    counter = Map.get(state, caller_ip, 0)
 
-    new_state = %{state | counter: new_counter, blocked: new_blocked}
+    {new_counter, is_blocked} =
+      if counter < @const_threshold do
+        Process.send_after(self(), {:handle_blocked, caller_ip}, @const_time)
+        {counter + 1, false}
+      else
+        {counter, true}
+      end
+
+    new_state = Map.put(state, caller_ip, new_counter)
     IO.inspect(new_state, label: "New State after possible block")
-    Process.send_after(self(), :handle_blocked, 10000)
-
-    {:reply, new_blocked, new_state}
+    {:reply, is_blocked, new_state}
   end
 
   @impl true
-  def handle_call(:check_state, _from, state) do
-    {:reply, state.blocked, state}
+  def handle_call({:check_state, caller_ip}, _from, state) do
+    counter = Map.get(state, caller_ip, 0)
+    {:reply, counter > @const_threshold, state}
   end
 
   @impl true
-  def handle_info(:handle_blocked, state) do
-    new_counter = state.counter - 1
-    new_state = %{state | counter: new_counter}
+  def handle_info({:handle_blocked, caller_ip}, state) do
+    counter = Map.get(state, caller_ip, 0)
+
+    new_state = Map.put(state, caller_ip, counter - 1)
+
     IO.inspect(new_state, label: "New State after 10s")
+
     {:noreply, new_state}
   end
 end
