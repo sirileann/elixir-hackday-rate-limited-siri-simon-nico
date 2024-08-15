@@ -8,6 +8,6 @@ defmodule RateLimitedWeb.Router do
   scope "/api", RateLimitedWeb do
     pipe_through :api
 
-    get "/ping/:number", PingController, :pong
+    get "/ping", PingController, :pong
   end
 end
