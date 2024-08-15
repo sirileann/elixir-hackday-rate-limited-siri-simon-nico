@@ -27,17 +27,14 @@ defmodule Limiter do
 
   @impl true
   def handle_call(:block, _from, state) do
-    if state.counter < 3, do:
-      new_counter = state.counter + 1
+    new_counter = state.counter + 1
+    new_blocked = if new_counter > 3, do: true, else: false
 
-      new_blocked = if new_counter > 3, do: true, else: false
+    new_state = %{state | counter: new_counter, blocked: new_blocked}
+    IO.inspect(new_state, label: "New State after possible block")
+    Process.send_after(self(), :handle_blocked, 10000)
 
-      new_state = %{state | counter: new_counter, blocked: new_blocked}
-      IO.inspect(new_state, label: "New State after possible block")
-      Process.send_after(self(), :handle_blocked, 10000)
-      {:reply, new_blocked, new_state}
-    end
-    {:reply, state.blocked, state}
+    {:reply, new_blocked, new_state}
   end
 
   @impl true

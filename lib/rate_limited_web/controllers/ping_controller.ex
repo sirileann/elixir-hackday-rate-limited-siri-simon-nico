@@ -3,7 +3,7 @@ defmodule RateLimitedWeb.PingController do
 
   def pong(conn, params) do
     IO.inspect(params)
-    Limiter.block
-    text(conn, Limiter.check_state)
+    Limiter.block()
+    text(conn, Limiter.check_state())
   end
 end
